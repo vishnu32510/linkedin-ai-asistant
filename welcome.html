@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Welcome - LinkedIn AI Assistance</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #0a66c2;
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+    .step {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border-left: 4px solid #0a66c2;
+    }
+    .step-number {
+      display: inline-block;
+      background: #0a66c2;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: bold;
+      margin-right: 12px;
+    }
+    .step-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    .step-content {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .step-content a {
+      color: #0a66c2;
+      text-decoration: none;
+    }
+    .step-content a:hover {
+      text-decoration: underline;
+    }
+    .button {
+      display: inline-block;
+      background: #0a66c2;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .button:hover {
+      background: #004182;
+    }
+    .button-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .button-secondary:hover {
+      background: #d0d0d0;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #856404;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    .warning strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎉 Welcome to LinkedIn AI Assistance!</h1>
+    <p class="subtitle">Generate personalized LinkedIn notes and messages using AI</p>
+
+    <div class="step">
+      <div>
+        <span class="step-number">1</span>
+        <span class="step-title">Get Your OpenAI API Key</span>
+      </div>
+      <div class="step-content">
+        <p>You'll need your own OpenAI API key to use this extension:</p>
+        <ol>
+          <li>Visit <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a></li>
+          <li>Sign up or log in to your account</li>
+          <li>Go to API Keys section</li>
+          <li>Create a new API key (starts with "sk-proj-" or "sk-")</li>
+        </ol>
+        <p><strong>Note:</strong> OpenAI charges based on usage. Check their <a href="https://openai.com/pricing" target="_blank">pricing page</a> for details.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <span class="step-number">2</span>
+        <span class="step-title">Set Up Your API Key</span>
+      </div>
+      <div class="step-content">
+        <p>Add your API key to the extension:</p>
+        <ol>
+          <li>Right-click the extension icon in your toolbar</li>
+          <li>Click <strong>"Options"</strong></li>
+          <li>Paste your OpenAI API key</li>
+          <li>Click <strong>"Save"</strong></li>
+          <li>(Optional) Click <strong>"Test Connection"</strong> to verify</li>
+        </ol>
+        <button class="button" onclick="openOptions()">Open Options Page</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <span class="step-number">3</span>
+        <span class="step-title">Start Using on LinkedIn</span>
+      </div>
+      <div class="step-content">
+        <p>Navigate to any LinkedIn profile page:</p>
+        <ol>
+          <li>Go to <code>linkedin.com/in/username</code></li>
+          <li>You'll see two buttons:
+            <ul>
+              <li><strong>"Generate LinkedIn Note"</strong> - For connection requests</li>
+              <li><strong>"Generate LinkedIn Message"</strong> - For direct messages</li>
+            </ul>
+          </li>
+          <li>Click either button and optionally add a job description</li>
+          <li>The extension will automatically generate and paste the content!</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="warning">
+      <strong>🔒 Privacy & Security</strong>
+      Your API key is stored locally in your browser and never shared. It's only used to make API calls to OpenAI when you generate notes/messages.
+    </div>
+
+    <div style="margin-top: 30px; text-align: center;">
+      <button class="button" onclick="openOptions()">Set Up API Key Now</button>
+      <button class="button button-secondary" onclick="window.close()" style="margin-left: 10px;">Close</button>
+    </div>
+
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #666; font-size: 12px;">
+      <p style="margin: 5px 0;">Developed by Vishnu Priyan Sellam Shanmugvaek</p>
+      <p style="margin: 5px 0;"><a href="mailto:vishnu32510@gmail.com" style="color: #0a66c2; text-decoration: none;">vishnu32510@gmail.com</a></p>
+    </div>
+  </div>
+
+  <script>
+    function openOptions() {
+      chrome.runtime.openOptionsPage();
+      window.close();
+    }
+  </script>
+</body>
+</html>

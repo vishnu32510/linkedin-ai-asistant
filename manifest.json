@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn GPT Note Generator",
+  "name": "LinkedIn AI Assistance",
   "version": "1.0.0",
-  "description": "Generate personalized LinkedIn notes using GPT.",
+  "description": "AI-powered LinkedIn assistant for generating personalized connection notes and messages.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": ["scripting", "activeTab", "storage"],
   "host_permissions": [
     "https://www.linkedin.com/in/*",
@@ -12,6 +17,12 @@
     "service_worker": "background.js"
   },
   "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["welcome.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["https://www.linkedin.com/in/*"],
