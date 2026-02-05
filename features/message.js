@@ -76,6 +76,14 @@
       profileTextarea.value = "Fetching profile details via AI...";
       profileTextarea.disabled = true;
 
+      // Load saved job description for this URL
+      const currentUrl = window.location.href;
+      chrome.storage.local.get([`job_desc_${currentUrl}`], function (result) {
+        if (result[`job_desc_${currentUrl}`]) {
+          textarea.value = result[`job_desc_${currentUrl}`];
+        }
+      });
+
       LinkedInExtension.Features.Profile.fetchProfileDetails(function (scraped) {
         profileTextarea.disabled = false;
         if (scraped) {
@@ -94,6 +102,11 @@
       const generateBtn = UI.createButton("Generate Message", () => {
         const profileData = profileTextarea.value.trim();
         const jobDesc = textarea.value.trim();
+
+        // Save job description for this URL
+        const currentUrl = window.location.href;
+        chrome.storage.local.set({ [`job_desc_${currentUrl}`]: jobDesc });
+
         document.getElementById("job-desc-popup-message").remove();
         onGenerate({ profileData, jobDescription: jobDesc });
       });
