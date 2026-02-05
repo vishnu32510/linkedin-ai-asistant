@@ -1,4 +1,4 @@
-// Button injection feature - Single Responsibility: Inject buttons into LinkedIn pages
+// Button injection feature - Single Responsibility: Inject floating buttons into LinkedIn pages
 (function() {
   'use strict';
   
@@ -10,33 +10,29 @@
   }
   
   const C = LinkedInExtension.Constants;
-  const DOM = LinkedInExtension.DOM;
   const UI = LinkedInExtension.UI;
   const Note = LinkedInExtension.Features.Note;
-  const Profile = LinkedInExtension.Features.Profile;
   const Message = LinkedInExtension.Features.Message;
 
   let lastUrl = location.href;
-  let isInjecting = false;
 
   function createNoteButton() {
     const btn = UI.createButton("Generate LinkedIn Note", function() {
-      // Check extension context before proceeding
       if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
         UI.showSnackbar("Extension context invalid. Please refresh the page.", "error", 6000);
         return;
       }
       
-      Note.createJobDescriptionPopup(function(jobDescription) {
-        Note.handleNoteGeneration(btn, jobDescription);
+      Note.createJobDescriptionPopup(function(inputs) {
+        Note.handleNoteGeneration(btn, inputs);
       });
     }, {
-      marginTop: "8px",
-      marginLeft: "8px",
-      padding: "8px 14px",
+      padding: "10px 16px",
       borderRadius: "16px",
       border: "1px solid #0a66c2",
-      background: "#0a66c2"
+      background: "#0a66c2",
+      margin: "0",
+      width: "220px"
     });
     btn.id = C.BUTTON_IDS.NOTE;
     return btn;
@@ -44,137 +40,100 @@
 
   function createMessageButton() {
     const btn = UI.createButton("Generate LinkedIn Message", function() {
-      // Check extension context before proceeding
       if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
         UI.showSnackbar("Extension context invalid. Please refresh the page.", "error", 6000);
         return;
       }
       
-      Message.createJobDescriptionPopup(function(jobDescription) {
-        Message.handleMessageGeneration(btn, jobDescription);
+      Message.createJobDescriptionPopup(function(inputs) {
+        Message.handleMessageGeneration(btn, inputs);
       });
     }, {
-      marginTop: "8px",
-      marginLeft: "8px",
-      padding: "8px 14px",
+      padding: "10px 16px",
       borderRadius: "16px",
       border: "1px solid #28a745",
-      background: "#28a745"
+      background: "#28a745",
+      margin: "0",
+      width: "220px"
     });
     btn.id = C.BUTTON_IDS.MESSAGE;
     return btn;
   }
 
+  function createFloatingPanel() {
+    const existing = document.getElementById(C.BUTTON_IDS.PANEL);
+    if (existing) existing.remove();
+
+    const panel = document.createElement("div");
+    panel.id = C.BUTTON_IDS.PANEL;
+    panel.style.cssText = `
+      position: fixed; right: 24px; bottom: 24px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 2147483647; padding: 12px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    `;
+
+    const title = document.createElement("div");
+    title.textContent = "LinkedIn AI Assistance";
+    title.style.cssText = "font-size: 12px; font-weight: 600; color: #333; text-align: center;";
+
+    panel.appendChild(title);
+    panel.appendChild(createNoteButton());
+    panel.appendChild(createMessageButton());
+
+    document.body.appendChild(panel);
+  }
+
+  function removeFloatingPanel() {
+    const existing = document.getElementById(C.BUTTON_IDS.PANEL);
+    if (existing) existing.remove();
+  }
+
   LinkedInExtension.Features.Injection = {
-    injectButtons: async function() {
-      const existingNoteBtn = document.getElementById(C.BUTTON_IDS.NOTE);
-      if (existingNoteBtn) existingNoteBtn.remove();
-      
-      const existingMessageBtn = document.getElementById(C.BUTTON_IDS.MESSAGE);
-      if (existingMessageBtn) existingMessageBtn.remove();
-
-      if (location.hostname !== "www.linkedin.com" || !location.pathname.startsWith("/in/")) {
-        return;
-      }
-
-      try {
-        const contactInfoLink = await DOM.waitForElement('a[href*="contact-info"]', 5000);
-        const noteBtn = createNoteButton();
-        const messageBtn = createMessageButton();
-        contactInfoLink.parentElement.insertBefore(noteBtn, contactInfoLink.nextSibling);
-        contactInfoLink.parentElement.insertBefore(messageBtn, noteBtn.nextSibling);
-      } catch (e) {
-        try {
-          const h1 = await DOM.waitForElement("h1", 5000);
-          const noteBtn = createNoteButton();
-          const messageBtn = createMessageButton();
-          h1.parentElement.appendChild(noteBtn);
-          h1.parentElement.appendChild(messageBtn);
-        } catch (e2) {
-          setTimeout(function() {
-            if (!document.getElementById(C.BUTTON_IDS.NOTE)) {
-              LinkedInExtension.Features.Injection.injectButtons();
-            }
-          }, 2000);
-        }
-      }
+    injectButtons: function() {
+      createFloatingPanel();
     },
 
     checkAndInject: function() {
       if (location.hostname !== "www.linkedin.com" || !location.pathname.startsWith("/in/")) {
-        const existingNoteBtn = document.getElementById(C.BUTTON_IDS.NOTE);
-        if (existingNoteBtn) existingNoteBtn.remove();
-        const existingMessageBtn = document.getElementById(C.BUTTON_IDS.MESSAGE);
-        if (existingMessageBtn) existingMessageBtn.remove();
+        removeFloatingPanel();
         return;
       }
 
-      if (isInjecting || document.getElementById(C.BUTTON_IDS.NOTE)) {
+      if (document.getElementById(C.BUTTON_IDS.PANEL)) {
         return;
       }
 
-      const h1 = document.querySelector("h1");
-      if (h1) {
-        isInjecting = true;
-        const self = this;
-        this.injectButtons().then(function() {
-          isInjecting = false;
-        }).catch(function() {
-          isInjecting = false;
-        });
-      }
+      this.injectButtons();
     },
 
     initializeInjection: function() {
       const self = this;
-      
-      setInterval(function() {
+
+      function handleUrlChange() {
         if (location.href !== lastUrl) {
           lastUrl = location.href;
-          setTimeout(function() {
-            self.checkAndInject();
-          }, 500);
-        }
-      }, 300);
-
-      window.addEventListener('popstate', function() {
-        lastUrl = location.href;
-        setTimeout(function() {
           self.checkAndInject();
-        }, 500);
-      });
-
-      const observer = new MutationObserver(function() {
-        if (location.href !== lastUrl) {
-          lastUrl = location.href;
-          setTimeout(function() {
-            self.checkAndInject();
-          }, 500);
         }
-      });
+      }
 
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
+      setInterval(handleUrlChange, 500);
+      window.addEventListener('popstate', handleUrlChange);
 
       const originalPushState = history.pushState;
       const originalReplaceState = history.replaceState;
 
       history.pushState = function() {
         originalPushState.apply(history, arguments);
-        lastUrl = location.href;
-        setTimeout(function() {
-          self.checkAndInject();
-        }, 500);
+        handleUrlChange();
       };
 
       history.replaceState = function() {
         originalReplaceState.apply(history, arguments);
-        lastUrl = location.href;
-        setTimeout(function() {
-          self.checkAndInject();
-        }, 500);
+        handleUrlChange();
       };
 
       this.checkAndInject();

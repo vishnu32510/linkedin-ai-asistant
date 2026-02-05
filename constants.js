@@ -11,19 +11,26 @@
     BUTTON_IDS: {
       NOTE: "li-gpt-note-btn",
       MESSAGE: "li-gpt-message-btn",
-      SNACKBAR: "li-snackbar"
+      SNACKBAR: "li-snackbar",
+      PANEL: "li-gpt-floating-panel"
     },
     
     SELECTORS: {
       LINKEDIN_PROFILE: "https://www.linkedin.com/in/",
       MORE_BUTTON: 'button[aria-label="More actions"]',
-      MESSAGE_BUTTON: 'button[aria-label*="Message"]',
-      CONNECT_BUTTON: 'button[aria-label*="Connect"]',
+      MORE_BUTTON_ALT: 'button[aria-label="More"]',
+      MORE_BUTTON_DATA: 'button[data-view-name="profile-overflow-button"]',
+      MESSAGE_BUTTON: 'a[href*="/messaging/compose/"]',
+      CONNECT_BUTTON: 'a[href*="/custom-invite/"]',
+      NOTE_TEXTAREA: 'textarea#custom-message',
       DROPDOWN: [
         '.artdeco-dropdown__content',
         '[role="menu"]',
         '[role="listbox"]',
-        '[role="box"]'
+        '[role="box"]',
+        '[data-view-name*="overflow"]',
+        '[data-view-name*="dropdown"]',
+        '.artdeco-dropdown__content-inner'
       ],
       MODAL: [
         '[role="dialog"]',

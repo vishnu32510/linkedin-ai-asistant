@@ -10,20 +10,53 @@
   }
 
   LinkedInExtension.Features.Profile = {
-    extractProfile: function() {
-      const h1 = document.querySelector("h1");
-      const name = (h1 && h1.innerText) ? h1.innerText.trim() : "Unknown";
-      
-      const suggestionTarget = document.querySelector('[data-generated-suggestion-target]');
-      const textBody = document.querySelector(".text-body-medium");
-      const headline = (suggestionTarget && suggestionTarget.innerText) 
-        ? suggestionTarget.innerText 
-        : (textBody && textBody.innerText) ? textBody.innerText : "";
-      
-      const companyLink = document.querySelector('a[href*="/company/"]');
-      const company = (companyLink && companyLink.innerText) ? companyLink.innerText.trim() : "Unknown";
-      
-      return { name: name, company: company, role: headline };
+    fetchProfileDetails: function (callback) {
+      console.log("🚀 Requesting AI-powered rich profile parsing...");
+
+      // Grab enough text for the top sections (header, experience, education)
+      // 5,000 chars is usually sufficient and saves significantly on token costs.
+      const pageText = document.body.innerText.substring(0, 5000);
+      const url = window.location.href;
+
+      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        console.error("Extension context not available");
+        callback(null);
+        return;
+      }
+
+      chrome.runtime.sendMessage({
+        type: "GENERATE_PROFILE",
+        payload: {
+          pageText: pageText,
+          url: url
+        }
+      }, function (res) {
+        if (chrome.runtime.lastError) {
+          console.error("GENERATE_PROFILE error:", chrome.runtime.lastError);
+          callback(null);
+          return;
+        }
+
+        if (res && res.ok && res.profile) {
+          console.log("✅ AI parsing complete:", res.profile);
+          callback(res.profile);
+        } else {
+          console.error("AI parsing failed:", res ? res.error : "No response");
+          callback(null);
+        }
+      });
+    },
+
+    // Legacy support
+    extractProfile: function () {
+      const name = document.title.split("|")[0].trim();
+      const firstName = name.split(" ")[0];
+      return {
+        name: name === "LinkedIn" ? "" : name,
+        firstName: firstName === "LinkedIn" ? "" : firstName,
+        company: "",
+        role: ""
+      };
     }
   };
 })();

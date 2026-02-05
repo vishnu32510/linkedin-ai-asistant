@@ -132,11 +132,22 @@
       >
       <div class="help-text">
         Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
-        Your key starts with "sk-proj-" or "sk-".
       </div>
 
-      <button type="submit">Save</button>
-      <button type="button" class="secondary" id="testBtn">Test Connection</button>
+      <label for="sheetsUrl">Google Sheets Webhook URL (Optional):</label>
+      <input 
+        type="text" 
+        id="sheetsUrl" 
+        placeholder="https://script.google.com/macros/s/.../exec" 
+        autocomplete="off"
+      >
+      <div class="help-text">
+        Paste your Google Apps Script Web App URL here to log every generation.
+      </div>
+
+      <button type="submit">Save Settings</button>
+      <button type="button" class="secondary" id="testBtn">Test OpenAI</button>
+      <button type="button" class="secondary" id="testSheetsBtn">Test Sheets</button>
     </form>
 
           <div id="status" class="status"></div>

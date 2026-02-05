@@ -1,4 +1,4 @@
-// Background service worker - handles API calls
+// Background service worker - handles API calls, Caching, and Logging
 // Note: For ES6 modules, use bundler. For now, using inline implementation
 
 // Show welcome page on first install
@@ -10,35 +10,146 @@ chrome.runtime.onInstalled.addListener(function(details) {
   }
 });
 
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-  if (msg.type !== "GENERATE_NOTE" && msg.type !== "GENERATE_MESSAGE") {
+  if (msg.type === "LOG_TO_SHEETS") {
+    handleSheetsLogging(msg.payload, sendResponse);
+    return true;
+  }
+
+  if (msg.type !== "GENERATE_NOTE" && msg.type !== "GENERATE_MESSAGE" && msg.type !== "GENERATE_PROFILE") {
     return;
   }
 
-  const name = msg.payload.name;
-  const company = msg.payload.company;
-  const role = msg.payload.role;
-  const jobDescription = msg.payload.jobDescription || null;
+  const payload = msg.payload || {};
+  const pageText = payload.pageText || "";
+  const url = payload.url || "";
 
-  // Get API key from storage
-  chrome.storage.sync.get(['openaiApiKey'], function(result) {
+  // Get API key and Sheets URL from storage
+  chrome.storage.sync.get(['openaiApiKey', 'googleSheetsUrl'], function (result) {
     const apiKey = result.openaiApiKey;
     
     if (!apiKey) {
-      sendResponse({ 
-        ok: false, 
-        error: "API key not set. Please set your OpenAI API key in the extension options." 
+      sendResponse({ ok: false, error: "API key not set. Please set it in Options." });
+      return;
+    }
+
+    if (msg.type === "GENERATE_PROFILE") {
+      checkCache(url, function (cachedData) {
+        if (cachedData) {
+          console.log("📦 Cache hit for:", url);
+          sendResponse({ ok: true, profile: cachedData });
+        } else {
+          performAIProfileExtraction(apiKey, pageText, url, sendResponse);
+        }
       });
       return;
     }
 
-    let prompt;
-    let maxTokens;
-    let responseKey;
+    // Handle Note/Message generation
+    performAIGeneration(apiKey, msg, payload, sendResponse);
+  });
 
-    if (msg.type === "GENERATE_NOTE") {
-      // Note generation prompt (short, 300 chars max)
-      prompt = `
+  return true; // Keep channel open for async response
+});
+
+/**
+ * Checks if a profile is cached and valid (< 7 days)
+ */
+function checkCache(url, callback) {
+  const cacheKey = `profile_cache_${url}`;
+  chrome.storage.local.get([cacheKey], function (result) {
+    const data = result[cacheKey];
+    if (data && (Date.now() - data.timestamp < CACHE_TTL)) {
+      callback(data.profile);
+    } else {
+      callback(null);
+    }
+  });
+}
+
+/**
+ * Saves a profile to cache
+ */
+function saveToCache(url, profile) {
+  const cacheKey = `profile_cache_${url}`;
+  const data = {
+    profile: profile,
+    timestamp: Date.now()
+  };
+  chrome.storage.local.set({ [cacheKey]: data });
+}
+
+/**
+ * Extracts profile data using OpenAI
+ */
+function performAIProfileExtraction(apiKey, pageText, url, sendResponse) {
+  const prompt = `
+Extract detailed profile information from this LinkedIn profile text. 
+Focus on identifying the current role, full experience history, and education.
+
+Profile Text Snippet:
+${pageText.substring(0, 8000)}
+
+URL: ${url}
+
+Return a valid JSON object with the following structure:
+{
+  "name": "Full Name",
+  "firstName": "First Name",
+  "company": "Current Company Name",
+  "role": "Current Job Title / Headline",
+  "location": "City, State/Country",
+  "experiences": [
+    {
+      "title": "Job Title",
+      "company": "Company Name",
+      "duration": "e.g. 2 yrs 3 mos",
+      "description": "Brief summary of responsibilities (max 2 sentences)"
+    }
+  ],
+  "education": [
+    {
+      "school": "University Name",
+      "degree": "Degree Name"
+    }
+  ]
+}
+
+Rules:
+- If a value is unknown, use an empty string or empty array.
+- Be concise in the experience descriptions.
+- Return ONLY the JSON object. No markdown formatting.
+`;
+
+  fetchOpenAI(apiKey, prompt, 800)
+    .then(content => {
+      try {
+        const cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
+        const profile = JSON.parse(cleanContent);
+        saveToCache(url, profile);
+        sendResponse({ ok: true, profile: profile });
+      } catch (e) {
+        sendResponse({ ok: false, error: "JSON parse failed" });
+      }
+    })
+    .catch(err => sendResponse({ ok: false, error: err.message }));
+}
+
+/**
+ * Generates Note or Message using OpenAI
+ */
+function performAIGeneration(apiKey, msg, payload, sendResponse) {
+  let prompt;
+  let maxTokens;
+  let responseKey;
+
+  const { name, firstName, company, role, jobDescription } = payload;
+  const resumeDetails = getResumeDetails();
+
+  if (msg.type === "GENERATE_NOTE") {
+    prompt = `
 Write a single-paragraph LinkedIn connection note. Be professional and warm.
 
 Recipient:
@@ -68,92 +179,11 @@ Rules:
 - STRICT: Maximum 290 characters. Verify character count before responding.
 - If your response exceeds 290 characters, shorten it by removing words, not truncating.
 `;
-      maxTokens = 120;
-      responseKey = "note";
-      } else {
-
-      resumeDetails = `
-CONTACT INFORMATION:
-- Location: Charlotte, NC 28277
-- Phone: +13127154060
-- Email: vishnu32510@gmail.com
-- LinkedIn: linkedin.com/in/vishnu32510
-- GitHub: github.com/vishnu32510
-- Devpost: devpost.com/vishnu32510
-- Website: vishnupriyan.dev
-
-SUMMARY:
-- Backend Engineer with 4 years of experience building Python and JavaScript backend systems in production. Experienced in cloud-native microservices, ETL pipelines, and event-driven architectures on AWS, GCP, and Azure, with a focus on reliability, auditability, and scalability.
-- Flutter Engineer with 5 years of experience building scalable, production-ready apps using Flutter SDK, Dart, and Bloc. Skilled in Clean Architecture, state management, and automated testing (unit, widget, integration). Delivered healthtech, fintech and sustainability products in agile teams, ensuring performance and reliability.
-- Published open-source SDKs (perplexity_dart, perplexity_flutter) and built hackathon winning apps (Floxi, Chi Planner). Currently contributing to Dart Frog.
-
-SKILLS:
-- Programming Languages: Python, JavaScript, TypeScript, Go, Dart, Kotlin, Swift, C, C++, Java, Rust, Scala
-- Gen AI & LLM Tools: ADK, LangChain, AutoGen, MCP, RAG pipelines, LLMs, OCR+LLM extraction, Vector embedding, Prompt Engineering
-- Frameworks & Libs: Flask, FastAPI, Node.js, React.js, Next.js, Angular, Gin, Play Framework, Room, Mocha, Dart Frog, Bloc, Provider, Riverpod, MVVM, MVC, MVI, Clean Architecture
-- Cloud & DevOps: GCP, Azure, AWS, Firebase, Docker, Containers, FCM, CI/CD, Pub/Sub, Jenkins, Git
-- Data & Integrations: REST/gRPC APIs, BigQuery, GraphQL, Kafka, RabbitMQ, ETL, Data Pipelines, Automations, SQL, SQLite, Hive, NoSQL
-- Mobile Development: Flutter SDK, Android SDK, Jetpack Compose, SwiftUI, Bloc, Redux, MVVM, JUnit, Mockito, XCTest, a11y
-- Tools & Platforms: VSCode, Android Studio, XCode, Jupyter Notebooks, JIRA, GIT
-- Testing: Flutter Test, Widget Test, Unit Test, Mockito, Integration Tests, Firebase Test, JUnit, XCTest
-- Methodologies: OOP, TDD, SOLID, Agile, Scrum, Integration Testing, Distributed Systems, Multi-Tiered, Continuous Integration pipelines, Flutter-First Mindset
-
-WORK EXPERIENCE:
-- BACKEND ENGINEER / SOFTWARE DEVELOPER | HealthLab Innovations Inc, Arlington, VA | Remote | OCT 2025 - Present
-  Tech: Python (FastAPI), GoLang, React.js(TypeScript), OCR, GCP, Azure, MongoDB, Docker, LLM Integration, Healthcare Data, AWS, JSON
-  Designed FastAPI and Go microservices for lab code mapping and data validation, improving data accuracy.
-  Built production ETL pipelines processing 1.5M+ files, with idempotency, audit logs, and automated 8 Cloud Run jobs.
-  Designed and deployed Dockerized services on GCP/Azure using CI/CD pipelines, safe rollout, achieving 99% uptime.
-  Implemented REST/gRPC + GraphQL APIs with auditability, observability, and healthcare compliance requirements.
-  Built and maintained React.js/Next.js + TypeScript portals for patients and staff by adding role based access.
-  Building and deploying REST APIs using FastAPI and GoLang for lab code mapping and scalable lookup microservices.
-
-- FLUTTER ENGINEER / SOFTWARE DEVELOPMENT INTERN | Leap Of Faith Technologies, Chicago, IL | Remote | MAY 2025 - Present
-  Tech: Python, AWS, ETL, Flutter(Dart), Provider, EHR/FHIR, HIPAA Certified, Functional Tool, MCP, Docker, LoRA/QLoRA, LLaMA
-  Integrated MCP and LLM/agent based ETL with FlaskAPI, enabling automated insight for healthcare operations.
-  Built & deployed a HIPAA-compliant healthcare Flutter app for EHR/FHIR data visualization on Play & App Store.
-  Developed secure modules combining mobile technology and AI with Flutter to deliver a HIPAA-compliant experience.
-  Developed backend mapping logic in FastAPI for the TheraCare platform, supporting patients and clinicians.
-  Implemented TalkBack/VoiceOver accessibility, increasing compliance with accessibility standards for visually impaired.
-
-- FLUTTER ENGINEER / BACKEND ENGINEER / CO-FOUNDER | Floxi, Chicago, IL | floxi.co | APR 2025 - Present
-  Tech: Flask(Python), Node.js(JavaScript), Next.js(TypeScript), ADK, Flutter(Dart), Dart(Frog), Android, iOS, AI(LLM), Cloud SQL, Docker, Jetpack Compose, SwiftUI
-  Migrating B2B+B2C eco-reward app from Flutter to native Android/iOS with Jetpack Compose & SwiftUI.
-  Deployed AI integrated Flutter app to the App and Play Store using automated CI/CD pipelines.
-  Built and maintained web and mobile features for eco-reward platforms using React.js, Next.js, Flutter, Node.js and Flask.
-  Deployed Dockerized Node.js/Flask APIs migrated MySQL to PostgreSQL using backward-compatible schema changes.
-  Designed a RAG-based eco-product suggestion system using agentic orchestration with functional & MCP tools.
-  Built a receipt-extraction pipeline with OCR/LLM hybrid models, achieving 95% accuracy across real-world receipts.
-  Built AI-driven product suggestions, barcode scanning, and receipt-based carbon tracking as scalable GCP microservices.
-  Collaborated through pair programming, design syncs, and reviews to ensure rapid iteration and maintainable code.
-
-- FLUTTER ENGINEER II | Grootan Technologies, Chennai | MAR 2022 - NOV 2023
-  Tech: Dart(Flutter), Kotlin(Android), Swift(iOS), Plugin, TeamCity(CI/CD), Sentry, State management(Bloc), DSA, Fintech
-  Collaborated in an agile, cross-functional team coordinating with PM in White-Label Superapps (Istanbul Senin - Banking, 1M+ downloads).
-  Modularized the app architecture improving maintainability and scalability, reducing application load time by 40%.
-  Refactored 50k+ LOC using Bloc, TDD, and SOLID principles, boosting test (unit and integration) coverage by 80%.
-  Integrated Stripe for payments and built biometric authentication workflows to enhance app security and UI/UX.
-  Implemented TalkBack/VoiceOver accessibility raising compliance. Leveraged Kotlin and Swift for plugin development.
-  Diagnosed ANRs and memory leaks via Profiler and Sentry. Automated CI/CD via TeamCity, reducing effort by 80%.
-  Mentored and onboarded 3 junior engineers, conducted code reviews, owned feature modules & contributed to architecture decisions.
-
-- FLUTTER DEVELOPER / SOFTWARE ENGINEER | Farazon Software Technologies, Coimbatore | APR 2021 - MAR 2022
-  Tech: Python, R & D, Dart(Flutter), Bloc, Flask, Embedded C, Firebase, Internet of Things, Embedded Systems, AWS, MQTT, DSA
-  Contributed to the R & D team developing real-time IoT systems for oxygen generators using Flutter and MQTT.
-  Collaborated with the R & D team to develop real-time IoT systems for oxygen generators using Flutter and MQTT.
-  Developed cross-platform sensor-based apps (Bluetooth, GPS, NFC) & integrated IoT telemetry using Flask & Firebase.
-
-HACKATHON PROJECTS & ACHIEVEMENTS:
-- Fact Dynamics (Perplexity AI Cookbook): Built a real-time AI-powered fact checking app to verify spoken and visual claims Android/iOS/Web via Firebase. Authored and published perplexity_dart & perplexity_flutter SDKs on pub.dev.
-- Chi Planner (Winner - Scarlet Hacks 2024): Won the hackathon for developing a real-time trip planner.
-
-EDUCATION:
-- Master of Science in Computer Science | Illinois Institute of Technology, Chicago, IL | JAN 2024 - DEC 2025 | 3.4/4
-  Coursework: Machine Learning, Computer Vision, Operating Systems, Data Structures & Algorithms, Big Data Technology
-- Bachelor of Technology, Electronics and Communication Engineering | Amrita Vishwa Vidhyapeetham, Coimbatore, India | JUL 2017 - JUN 2021 | 7.47/10
-`;
-      // Message generation prompt (longer, professional message)
-      prompt = `
+    maxTokens = 150;
+    responseKey = "note";
+  } else {
+    // Message generation prompt (longer, professional message)
+    prompt = `
 Write a professional LinkedIn message. Be warm, personalized, and show genuine interest.
 
 Recipient:
@@ -251,104 +281,191 @@ MESSAGE: Hi John,
 
 I'm reaching out to connect and learn more about your work at [Company]. As a [role], your experience is inspiring.
 
-My background as a Backend Engineer includes building scalable microservices at HealthLab Innovations, which aligns with [Company]'s focus on [specific aspect].
+My background as a Bac
 `;
+    maxTokens = 800;
+    responseKey = "message";
+  }
 
-      maxTokens = 500;
-      responseKey = "message";
-    }
+  fetchOpenAI(apiKey, prompt, maxTokens)
+    .then(content => {
+      const response = { ok: true };
+      if (responseKey === "message") {
+        const subjectMatch = content.match(/SUBJECT:\s*(.+?)(?:\n|$)/i);
+        const messageMatch = content.match(/MESSAGE:\s*([\s\S]+)/i);
 
-    fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: maxTokens
-      })
-    })
-      .then(function(res) {
-        if (!res.ok) {
-          return res.json().then(function(errorData) {
-            throw new Error(errorData.error?.message || 'API request failed: ' + res.status);
-          });
+        let messageBody = '';
+        if (subjectMatch && messageMatch) {
+          response.subject = subjectMatch[1].trim();
+          messageBody = messageMatch[1].trim();
+        } else {
+          const lines = content.split('\n');
+          response.subject = lines[0].replace(/SUBJECT:/i, "").trim().substring(0, 60);
+          messageBody = content.replace(/SUBJECT:.*|MESSAGE:/ig, "").trim();
         }
-        return res.json();
-      })
-      .then(function(data) {
-        // Check for API errors in response
-        if (data.error) {
-          sendResponse({ 
-            ok: false, 
-            error: data.error.message || 'OpenAI API error: ' + JSON.stringify(data.error)
-          });
-          return;
-        }
-        
-        const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) 
-          ? data.choices[0].message.content.trim() 
-          : null;
-        
-        if (!content) {
-          sendResponse({ 
-            ok: false, 
-            error: 'No content generated. API response: ' + JSON.stringify(data)
-          });
-          return;
-        }
-        
-        const response = {};
-        response.ok = true;
-        
-        // For messages, parse subject and body
-        if (responseKey === "message") {
-          const subjectMatch = content.match(/SUBJECT:\s*(.+?)(?:\n|$)/i);
-          const messageMatch = content.match(/MESSAGE:\s*([\s\S]+)/i);
-          
-          let messageBody = '';
-          if (subjectMatch && messageMatch) {
-            response.subject = subjectMatch[1].trim();
-            messageBody = messageMatch[1].trim();
-          } else {
-            // Fallback: use first line as subject, rest as message
-            const lines = content.split('\n');
-            response.subject = lines[0].trim().substring(0, 60);
-            messageBody = content;
-          }
-          
-          // Automatically append portfolio links and signature
-          const portfolioLinks =
-          `Portfolio: https://vishnupriyan.dev/
+
+        const portfolioLinks = `
+Portfolio: https://vishnupriyan.dev/
 GitHub: https://github.com/vishnu32510
 Floxi (Co-founder): https://floxi.co
 Fact Dynamics (Perplexity Showcase): https://docs.perplexity.ai/cookbook/showcase/fact-dynamics
 
 Thank you for your time and consideration. I'd love the opportunity to speak further.
 
-
 Best regards,
 Vishnu Priyan Sellam Shanmugavel
 vishnu32510@gmail.com`;
-          
-          response.message = messageBody + '\n\n' + portfolioLinks;
+
+        response.message = messageBody + '\n\n' + portfolioLinks;
+      } else {
+        response[responseKey] = content.trim();
+      }
+      sendResponse(response);
+    })
+    .catch(err => sendResponse({ ok: false, error: err.message }));
+}
+
+function fetchOpenAI(apiKey, prompt, maxTokens) {
+  return fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: maxTokens
+    })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error.message);
+      return data.choices[0].message.content.trim();
+    });
+}
+
+function handleSheetsLogging(data, sendResponse) {
+  chrome.storage.sync.get(['googleSheetsUrl'], function (result) {
+    const url = result.googleSheetsUrl;
+
+    if (!url) {
+      console.warn("📁 Google Sheets URL not set. Skipping log.");
+      sendResponse({ ok: false, error: "Sheets URL not set" });
+      return;
+    }
+
+    console.log("📁 Logging to Sheets:", url);
+    const payload = {
+      ...data,
+      timestamp: new Date().toISOString(),
+      dateLabel: new Date().toLocaleString()
+    };
+
+    fetch(url, {
+      method: "POST",
+      redirect: "follow",
+      // Using text/plain to avoid CORS preflight, which GAS doesn't handle well
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("❌ Sheets Log Failed:", res.status, text);
+          sendResponse({ ok: false, error: `Sheets Error: ${res.status}` });
         } else {
-          response[responseKey] = content;
+          console.log("✅ Sheets Log Success!");
+          sendResponse({ ok: true });
         }
-        
-        sendResponse(response);
       })
-      .catch(function(err) {
-        console.error('OpenAI API Error:', err);
-        sendResponse({ 
-          ok: false, 
-          error: err.message || 'Failed to generate content. Please check your API key and try again.'
-        });
+      .catch(err => {
+        console.error("❌ Sheets Log Network Error:", err);
+        sendResponse({ ok: false, error: err.message });
       });
   });
+}
 
-  return true; // Keep channel open for async response
-});
+function getResumeDetails() {
+  return `
+CONTACT INFORMATION:
+- Location: Charlotte, NC 28277
+- Phone: +13127154060
+- Email: vishnu32510@gmail.com
+- LinkedIn: linkedin.com/in/vishnu32510
+- GitHub: github.com/vishnu32510
+- Devpost: devpost.com/vishnu32510
+- Website: vishnupriyan.dev
+
+SUMMARY:
+- Backend Engineer with 4 years of experience building Python and JavaScript backend systems in production. Experienced in cloud-native microservices, ETL pipelines, and event-driven architectures on AWS, GCP, and Azure, with a focus on reliability, auditability, and scalability.
+- Flutter Engineer with 5 years of experience building scalable, production-ready apps using Flutter SDK, Dart, and Bloc. Skilled in Clean Architecture, state management, and automated testing (unit, widget, integration). Delivered healthtech, fintech and sustainability products in agile teams, ensuring performance and reliability.
+- Published open-source SDKs (perplexity_dart, perplexity_flutter) and built hackathon winning apps (Floxi, Chi Planner). Currently contributing to Dart Frog.
+
+SKILLS:
+- Programming Languages: Python, JavaScript, TypeScript, Go, Dart, Kotlin, Swift, C, C++, Java, Rust, Scala
+- Gen AI & LLM Tools: ADK, LangChain, AutoGen, MCP, RAG pipelines, LLMs, OCR+LLM extraction, Vector embedding, Prompt Engineering
+- Frameworks & Libs: Flask, FastAPI, Node.js, React.js, Next.js, Angular, Gin, Play Framework, Room, Mocha, Dart Frog, Bloc, Provider, Riverpod, MVVM, MVC, MVI, Clean Architecture
+- Cloud & DevOps: GCP, Azure, AWS, Firebase, Docker, Containers, FCM, CI/CD, Pub/Sub, Jenkins, Git
+- Data & Integrations: REST/gRPC APIs, BigQuery, GraphQL, Kafka, RabbitMQ, ETL, Data Pipelines, Automations, SQL, SQLite, Hive, NoSQL
+- Mobile Development: Flutter SDK, Android SDK, Jetpack Compose, SwiftUI, Bloc, Redux, MVVM, JUnit, Mockito, XCTest, a11y
+- Tools & Platforms: VSCode, Android Studio, XCode, Jupyter Notebooks, JIRA, GIT
+- Testing: Flutter Test, Widget Test, Unit Test, Mockito, Integration Tests, Firebase Test, JUnit, XCTest
+- Methodologies: OOP, TDD, SOLID, Agile, Scrum, Integration Testing, Distributed Systems, Multi-Tiered, Continuous Integration pipelines, Flutter-First Mindset
+
+WORK EXPERIENCE:
+- BACKEND ENGINEER / SOFTWARE DEVELOPER | HealthLab Innovations Inc, Arlington, VA | Remote | OCT 2025 - Present
+  Tech: Python (FastAPI), GoLang, React.js(TypeScript), OCR, GCP, Azure, MongoDB, Docker, LLM Integration, Healthcare Data, AWS, JSON
+  Designed FastAPI and Go microservices for lab code mapping and data validation, improving data accuracy.
+  Built production ETL pipelines processing 1.5M+ files, with idempotency, audit logs, and automated 8 Cloud Run jobs.
+  Designed and deployed Dockerized services on GCP/Azure using CI/CD pipelines, safe rollout, achieving 99% uptime.
+  Implemented REST/gRPC + GraphQL APIs with auditability, observability, and healthcare compliance requirements.
+  Built and maintained React.js/Next.js + TypeScript portals for patients and staff by adding role based access.
+  Building and deploying REST APIs using FastAPI and GoLang for lab code mapping and scalable lookup microservices.
+
+- FLUTTER ENGINEER / SOFTWARE DEVELOPMENT INTERN | Leap Of Faith Technologies, Chicago, IL | Remote | MAY 2025 - Present
+  Tech: Python, AWS, ETL, Flutter(Dart), Provider, EHR/FHIR, HIPAA Certified, Functional Tool, MCP, Docker, LoRA/QLoRA, LLaMA
+  Integrated MCP and LLM/agent based ETL with FlaskAPI, enabling automated insight for healthcare operations.
+  Built & deployed a HIPAA-compliant healthcare Flutter app for EHR/FHIR data visualization on Play & App Store.
+  Developed secure modules combining mobile technology and AI with Flutter to deliver a HIPAA-compliant experience.
+  Developed backend mapping logic in FastAPI for the TheraCare platform, supporting patients and clinicians.
+  Implemented TalkBack/VoiceOver accessibility, increasing compliance with accessibility standards for visually impaired.
+
+- FLUTTER ENGINEER / BACKEND ENGINEER / CO-FOUNDER | Floxi, Chicago, IL | floxi.co | APR 2025 - Present
+  Tech: Flask(Python), Node.js(JavaScript), Next.js(TypeScript), ADK, Flutter(Dart), Dart(Frog), Android, iOS, AI(LLM), Cloud SQL, Docker, Jetpack Compose, SwiftUI
+  Migrating B2B+B2C eco-reward app from Flutter to native Android/iOS with Jetpack Compose & SwiftUI.
+  Deployed AI integrated Flutter app to the App and Play Store using automated CI/CD pipelines.
+  Built and maintained web and mobile features for eco-reward platforms using React.js, Next.js, Flutter, Node.js and Flask.
+  Deployed Dockerized Node.js/Flask APIs migrated MySQL to PostgreSQL using backward-compatible schema changes.
+  Designed a RAG-based eco-product suggestion system using agentic orchestration with functional & MCP tools.
+  Built a receipt-extraction pipeline with OCR/LLM hybrid models, achieving 95% accuracy across real-world receipts.
+  Built AI-driven product suggestions, barcode scanning, and receipt-based carbon tracking as scalable GCP microservices.
+  Collaborated through pair programming, design syncs, and reviews to ensure rapid iteration and maintainable code.
+
+- FLUTTER ENGINEER II | Grootan Technologies, Chennai | MAR 2022 - NOV 2023
+  Tech: Dart(Flutter), Kotlin(Android), Swift(iOS), Plugin, TeamCity(CI/CD), Sentry, State management(Bloc), DSA, Fintech
+  Collaborated in an agile, cross-functional team coordinating with PM in White-Label Superapps (Istanbul Senin - Banking, 1M+ downloads).
+  Modularized the app architecture improving maintainability and scalability, reducing application load time by 40%.
+  Refactored 50k+ LOC using Bloc, TDD, and SOLID principles, boosting test (unit and integration) coverage by 80%.
+  Integrated Stripe for payments and built biometric authentication workflows to enhance app security and UI/UX.
+  Implemented TalkBack/VoiceOver accessibility raising compliance. Leveraged Kotlin and Swift for plugin development.
+  Diagnosed ANRs and memory leaks via Profiler and Sentry. Automated CI/CD via TeamCity, reducing effort by 80%.
+  Mentored and onboarded 3 junior engineers, conducted code reviews, owned feature modules & contributed to architecture decisions.
+
+- FLUTTER DEVELOPER / SOFTWARE ENGINEER | Farazon Software Technologies, Coimbatore | APR 2021 - MAR 2022
+  Tech: Python, R & D, Dart(Flutter), Bloc, Flask, Embedded C, Firebase, Internet of Things, Embedded Systems, AWS, MQTT, DSA
+  Contributed to the R & D team developing real-time IoT systems for oxygen generators using Flutter and MQTT.
+  Collaborated with the R & D team to develop real-time IoT systems for oxygen generators using Flutter and MQTT.
+  Developed cross-platform sensor-based apps (Bluetooth, GPS, NFC) & integrated IoT telemetry using Flask & Firebase.
+
+HACKATHON PROJECTS & ACHIEVEMENTS:
+- Fact Dynamics (Perplexity AI Cookbook): Built a real-time AI-powered fact checking app to verify spoken and visual claims Android/iOS/Web via Firebase. Authored and published perplexity_dart & perplexity_flutter SDKs on pub.dev.
+- Chi Planner (Winner - Scarlet Hacks 2024): Won the hackathon for developing a real-time trip planner.
+
+EDUCATION:
+- Master of Science in Computer Science | Illinois Institute of Technology, Chicago, IL | JAN 2024 - DEC 2025 | 3.4/4
+  Coursework: Machine Learning, Computer Vision, Operating Systems, Data Structures & Algorithms, Big Data Technology
+- Bachelor of Technology, Electronics and Communication Engineering | Amrita Vishwa Vidhyapeetham, Coimbatore, India | JUL 2017 - JUN 2021 | 7.47/10
+`;
+}

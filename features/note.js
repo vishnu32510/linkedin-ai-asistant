@@ -10,145 +10,139 @@
   }
   
   const C = LinkedInExtension.Constants;
-  const Profile = LinkedInExtension.Features.Profile;
-  const Connect = LinkedInExtension.Features.Connect;
   const UI = LinkedInExtension.UI;
+
+  function normalizeLine(line) {
+    return line.replace(/\s+/g, " ").trim();
+  }
+
+  function parseProfileData(profileData) {
+    const empty = { name: "Unknown", firstName: "Unknown", company: "Unknown", role: "Unknown" };
+    if (!profileData) return empty;
+
+    if (profileData.indexOf("Name: ") === 0) {
+      const lines = profileData.split("\n");
+      let name = "Unknown";
+      let company = "Unknown";
+      let role = "Unknown";
+      let location = "Unknown";
+      let experiences = [];
+      let education = [];
+      let currentSection = null;
+
+      lines.forEach(l => {
+        const trimmed = l.trim();
+        if (l.startsWith("Name: ")) name = l.replace("Name: ", "").trim();
+        else if (l.startsWith("Company: ")) company = l.replace("Company: ", "").trim();
+        else if (l.startsWith("Current Role: ")) role = l.replace("Current Role: ", "").trim();
+        else if (l.startsWith("Location: ")) location = l.replace("Location: ", "").trim();
+        else if (trimmed === "EXPERIENCE:") { currentSection = "exp"; }
+        else if (trimmed === "EDUCATION:") { currentSection = "edu"; }
+        else if (trimmed.startsWith("- ") && currentSection === "exp") { experiences.push(trimmed.substring(2)); }
+        else if (trimmed.startsWith("- ") && currentSection === "edu") { education.push(trimmed.substring(2)); }
+      });
+
+      const firstName = name !== "Unknown" ? name.split(" ")[0] : "Unknown";
+      return {
+        name, firstName, company, role, location, experiences, education
+      };
+    }
+    return empty; // Simple parser for now as we use AI scraping mostly
+  }
+
+  function showCopyFallback(title, text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    textarea.style.cssText = `width: 100%; min-height: 160px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;`;
+    const closeBtn = UI.createButton("Close", () => {
+      const popup = document.getElementById("copy-fallback-note");
+      if (popup) popup.remove();
+    }, { background: "#fff", color: "#666", border: "1px solid #ccc" });
+    UI.createModal(title, textarea, [closeBtn]).overlay.id = "copy-fallback-note";
+  }
 
   LinkedInExtension.Features.Note = {
     createJobDescriptionPopup: function(onGenerate) {
       const existingPopup = document.getElementById("job-desc-popup");
       if (existingPopup) existingPopup.remove();
 
+      const profileTextarea = document.createElement("textarea");
+      profileTextarea.id = "profile-data-input";
+      profileTextarea.placeholder = "Pasting profile details via AI...";
+      profileTextarea.style.cssText = `width: 100%; min-height: 120px; padding: 12px; border: 1px solid #ccc; border-radius: 4px;`;
+
       const textarea = document.createElement("textarea");
       textarea.id = "job-desc-input";
-      textarea.placeholder = "Paste job description here...";
-      textarea.style.cssText = `
-        width: 100%; min-height: 150px; padding: 12px; border: 1px solid #ccc;
-        border-radius: 4px; font-size: 14px; font-family: inherit;
-        resize: vertical; box-sizing: border-box;
-      `;
+      textarea.placeholder = "Paste job description here (optional)...";
+      textarea.style.cssText = `width: 100%; min-height: 150px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-top: 10px;`;
 
-      const self = this;
-      const cancelBtn = UI.createButton("Cancel", function() {
-        const popup = document.getElementById("job-desc-popup");
-        if (popup) popup.remove();
-      }, { background: "#fff", color: "#666", border: "1px solid #ccc" });
+      profileTextarea.value = "Fetching profile details via AI...";
+      profileTextarea.disabled = true;
 
-      const generateBtn = UI.createButton("Generate Note", function() {
-        const jobDescription = textarea.value.trim() || null;
-        const popup = document.getElementById("job-desc-popup");
-        if (popup) popup.remove();
-        onGenerate(jobDescription);
+      LinkedInExtension.Features.Profile.fetchProfileDetails(function (scraped) {
+        profileTextarea.disabled = false;
+        if (scraped) {
+          let str = `Name: ${scraped.name}\nCompany: ${scraped.company}\nCurrent Role: ${scraped.role}\nLocation: ${scraped.location}\n\nEXPERIENCE:\n`;
+          (scraped.experiences || []).forEach(exp => str += `- ${exp.title} at ${exp.company} (${exp.duration})\n`);
+          str += "\nEDUCATION:\n";
+          (scraped.education || []).forEach(edu => str += `- ${edu.school}: ${edu.degree}\n`);
+          profileTextarea.value = str.trim();
+        } else {
+          profileTextarea.value = "";
+          profileTextarea.placeholder = "AI failed to parse. Please paste details manually.";
+        }
       });
 
-      const desc = document.createElement("p");
-      desc.textContent = "Paste the job description you're applying to (optional):";
-      desc.style.cssText = "margin: 0 0 12px 0; font-size: 14px; color: #666;";
+      const cancelBtn = UI.createButton("Cancel", () => document.getElementById("job-desc-popup").remove(), { background: "#fff", color: "#666", border: "1px solid #ccc" });
+      const generateBtn = UI.createButton("Generate Note", () => {
+        const profileData = profileTextarea.value.trim();
+        const jobDesc = textarea.value.trim();
+        document.getElementById("job-desc-popup").remove();
+        onGenerate({ profileData, jobDescription: jobDesc });
+      });
 
-      const modalResult = UI.createModal(
-        "Enter Job Description",
-        null,
-        [cancelBtn, generateBtn]
-      );
-      
+      const modalResult = UI.createModal("Enter Details", null, [cancelBtn, generateBtn]);
       modalResult.overlay.id = "job-desc-popup";
       const modal = modalResult.overlay.querySelector('div');
-      modal.insertBefore(desc, modal.querySelector('div:last-child'));
+      modal.insertBefore(profileTextarea, modal.querySelector('div:last-child'));
       modal.insertBefore(textarea, modal.querySelector('div:last-child'));
-
-      setTimeout(function() { textarea.focus(); }, 100);
     },
 
-    handleNoteGeneration: async function(btn, jobDescription) {
-      jobDescription = jobDescription || null;
+    handleNoteGeneration: async function (btn, inputs) {
       btn.innerText = "Generating...";
       btn.disabled = true;
 
-      const profile = Profile.extractProfile();
+      const profile = parseProfileData(inputs.profileData);
+      const payload = { ...profile, jobDescription: inputs.jobDescription, profileData: inputs.profileData };
 
-      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
-        UI.showSnackbar("Extension context not available. Please reload the page.", "error");
+      chrome.runtime.sendMessage({ type: "GENERATE_NOTE", payload }, async (res) => {
         btn.disabled = false;
         btn.innerText = "Generate LinkedIn Note";
-        return;
-      }
 
-      try {
-        // Check if extension context is still valid
-        if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
-          UI.showSnackbar("Extension context not available. Please reload the page.", "error");
-          btn.disabled = false;
-          btn.innerText = "Generate LinkedIn Note";
-          return;
-        }
-
-        // Check for extension context invalidation
-        if (chrome.runtime.lastError) {
-          UI.showSnackbar("Extension was reloaded. Please refresh this page and try again.", "error", 8000);
-          btn.disabled = false;
-          btn.innerText = "Generate LinkedIn Note";
-          console.error("Extension context error:", chrome.runtime.lastError);
-          return;
-        }
-
-        const payload = {
-          name: profile.name,
-          company: profile.company,
-          role: profile.role,
-          jobDescription: jobDescription
-        };
-        
-        chrome.runtime.sendMessage(
-          {
-            type: "GENERATE_NOTE",
-            payload: payload
-          },
-          async function(res) {
-            // Check for extension context invalidation in callback
-            if (chrome.runtime.lastError) {
-              UI.showSnackbar("Extension was reloaded. Please refresh this page and try again.", "error", 8000);
-              btn.disabled = false;
-              btn.innerText = "Generate LinkedIn Note";
-              console.error("Extension context invalidated:", chrome.runtime.lastError.message);
-              return;
-            }
-
-            btn.disabled = false;
-            btn.innerText = "Generate LinkedIn Note";
-
-            if (!res) {
-              UI.showSnackbar("No response from extension. Please refresh the page and try again.", "error");
-              console.error("No response from background script");
-              return;
-            }
-
-            if (!res.ok) {
-              const errorMsg = res.error || "Failed to generate note";
-              UI.showSnackbar(errorMsg, "error", 8000);
-              console.error("Note generation error:", res.error);
-              return;
-            }
-
-            if (!res.note) {
-              UI.showSnackbar("Generated note is empty. Please try again.", "error");
-              console.error("Empty note in response:", res);
-              return;
-            }
-
-            await Connect.openConnectAndPaste(res.note);
+        if (res && res.ok && res.note) {
+          try {
+            await navigator.clipboard.writeText(res.note);
+            UI.showSnackbar("Note copied to clipboard! Logging to Sheets...", "success");
+            chrome.runtime.sendMessage({
+              type: "LOG_TO_SHEETS",
+              payload: {
+                type: "NOTE",
+                url: window.location.href,
+                name: profile.name,
+                company: profile.company,
+                role: profile.role,
+                content: res.note,
+                profileData: inputs.profileData
+              }
+            });
+          } catch (err) {
+            showCopyFallback("Copy Note", res.note);
           }
-        );
-      } catch (error) {
-        btn.disabled = false;
-        btn.innerText = "Generate LinkedIn Note";
-        
-        if (error.message && error.message.includes("Extension context invalidated")) {
-          UI.showSnackbar("Extension was reloaded. Please refresh this page and try again.", "error", 8000);
         } else {
-          UI.showSnackbar("Error generating note: " + error.message, "error", 8000);
+          UI.showSnackbar(res ? res.error : "Failed to generate note", "error");
         }
-        console.error("Note generation error:", error);
-      }
+      });
     }
   };
 })();

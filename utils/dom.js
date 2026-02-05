@@ -36,7 +36,11 @@
     isElementVisible: function(element) {
       if (!element) return false;
       const rect = element.getBoundingClientRect();
-      return element.offsetParent !== null && rect.width > 0 && rect.height > 0;
+      const style = window.getComputedStyle(element);
+      if (!style || style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+        return false;
+      }
+      return rect.width > 0 && rect.height > 0 && element.getClientRects().length > 0;
     },
 
     /**

@@ -1,31 +1,33 @@
-// Load saved API key
-chrome.storage.sync.get(['openaiApiKey'], (result) => {
+// Load saved settings
+chrome.storage.sync.get(['openaiApiKey', 'googleSheetsUrl'], (result) => {
   if (result.openaiApiKey) {
     document.getElementById('apiKey').value = result.openaiApiKey;
   }
+  if (result.googleSheetsUrl) {
+    document.getElementById('sheetsUrl').value = result.googleSheetsUrl;
+  }
 });
 
-// Save API key
+// Save settings
 document.getElementById('optionsForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const apiKey = document.getElementById('apiKey').value.trim();
+  const sheetsUrl = document.getElementById('sheetsUrl').value.trim();
   
   if (!apiKey) {
     showStatus('Please enter an API key', 'error');
     return;
   }
-  
-  if (!apiKey.startsWith('sk-')) {
-    showStatus('Invalid API key format. OpenAI keys start with "sk-"', 'error');
-    return;
-  }
-  
-  chrome.storage.sync.set({ openaiApiKey: apiKey }, () => {
-    showStatus('API key saved successfully!', 'success');
+
+  chrome.storage.sync.set({
+    openaiApiKey: apiKey,
+    googleSheetsUrl: sheetsUrl
+  }, () => {
+    showStatus('Settings saved successfully!', 'success');
   });
 });
 
-// Test connection
+// Test OpenAI Connection
 document.getElementById('testBtn').addEventListener('click', async () => {
   const apiKey = document.getElementById('apiKey').value.trim();
   
@@ -33,12 +35,7 @@ document.getElementById('testBtn').addEventListener('click', async () => {
     showStatus('Please enter an API key first', 'error');
     return;
   }
-  
-  if (!apiKey.startsWith('sk-')) {
-    showStatus('Invalid API key format', 'error');
-    return;
-  }
-  
+
   showStatus('Testing connection...', 'success');
   
   try {
@@ -57,6 +54,37 @@ document.getElementById('testBtn').addEventListener('click', async () => {
   } catch (err) {
     showStatus(`❌ Connection error: ${err.message}`, 'error');
   }
+});
+
+// Test Sheets Connection
+document.getElementById('testSheetsBtn').addEventListener('click', () => {
+  const url = document.getElementById('sheetsUrl').value.trim();
+
+  if (!url) {
+    showStatus('Please enter a Google Sheets Webhook URL first', 'error');
+    return;
+  }
+
+  showStatus('Testing Sheets connection...', 'success');
+
+  chrome.runtime.sendMessage({
+    type: "LOG_TO_SHEETS",
+    payload: {
+      type: "TEST",
+      url: "N/A",
+      name: "Test User",
+      company: "Test Company",
+      role: "Tester",
+      content: "This is a test message to verify the Google Sheets integration."
+    }
+  }, (response) => {
+    if (response && response.ok) {
+      showStatus('✅ Sheets connection successful! Check your Google Sheet.', 'success');
+    } else {
+      const error = response ? response.error : 'No response from background script';
+      showStatus(`❌ Sheets connection failed: ${error}`, 'error');
+    }
+  });
 });
 
 function showStatus(message, type) {
