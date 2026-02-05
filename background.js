@@ -227,18 +227,6 @@ Key Highlights:
 - Experience with cloud platforms (GCP, Azure, AWS), microservices, CI/CD, and distributed systems
 - Built production applications end-to-end with focus on scalability, security, and compliance
 
-My Portfolio Links (MUST INCLUDE ALL OF THESE IN EVERY MESSAGE):
-- Portfolio: https://vishnupriyan.dev/
-- GitHub: https://github.com/vishnu32510
-- Floxi (Co-founder): https://floxi.co
-- Fact Dynamics (Perplexity Showcase): https://docs.perplexity.ai/cookbook/showcase/fact-dynamics
-
-CRITICAL REQUIREMENT - PORTFOLIO LINKS:
-- You MUST ALWAYS include ALL four portfolio links listed above in every message - no exceptions
-- Format each link on its own line: "Portfolio: [URL]", "GitHub: [URL]", "Floxi (Co-founder): [URL]", "Fact Dynamics (Perplexity Showcase): [URL]"
-- Place all links together in a dedicated section near the end, before the closing
-- Never omit, skip, or forget any of these links - they must appear in every single message
-
 Instructions:
 ${jobDescription ? 
   `- Write a personalized message that relates the recipient's background to the job I'm applying to.
@@ -339,7 +327,7 @@ Best regards,
 Vishnu Priyan Sellam Shanmugavel
 vishnu32510@gmail.com`;
 
-        response.message = messageBody + '\n\n' + portfolioLinks;
+        response.message = messageBody + '\n' + portfolioLinks;
       } else {
         response[responseKey] = content.trim();
       }
