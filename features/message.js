@@ -142,6 +142,7 @@
                 company: profile.company,
                 role: profile.role,
                 content: res.message,
+                jobDescription: inputs.jobDescription,
                 profileData: inputs.profileData
               }
             });
