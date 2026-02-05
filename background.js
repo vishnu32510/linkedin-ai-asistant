@@ -11,6 +11,7 @@ chrome.runtime.onInstalled.addListener(function(details) {
 });
 
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+const MAX_CACHE_SIZE = 100; // Force clear after 100 profiles to keep storage clean
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === "LOG_TO_SHEETS") {
@@ -70,15 +71,37 @@ function checkCache(url, callback) {
 }
 
 /**
- * Saves a profile to cache
+ * Saves a profile to cache with a limit check
  */
 function saveToCache(url, profile) {
   const cacheKey = `profile_cache_${url}`;
-  const data = {
-    profile: profile,
-    timestamp: Date.now()
-  };
-  chrome.storage.local.set({ [cacheKey]: data });
+  const countKey = 'profile_cache_count';
+
+  chrome.storage.local.get([cacheKey, countKey], function (result) {
+    let count = result[countKey] || 0;
+    const isNew = !result[cacheKey];
+
+    if (isNew) {
+      if (count >= MAX_CACHE_SIZE) {
+        console.log("🧹 Cache limit reached. Clearing storage...");
+        chrome.storage.local.clear(function () {
+          const newData = {
+            [cacheKey]: { profile: profile, timestamp: Date.now() },
+            [countKey]: 1
+          };
+          chrome.storage.local.set(newData);
+        });
+        return;
+      }
+      count++;
+    }
+
+    const updates = {
+      [cacheKey]: { profile: profile, timestamp: Date.now() },
+      [countKey]: count
+    };
+    chrome.storage.local.set(updates);
+  });
 }
 
 /**
