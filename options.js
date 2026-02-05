@@ -75,7 +75,9 @@ document.getElementById('testSheetsBtn').addEventListener('click', () => {
       name: "Test User",
       company: "Test Company",
       role: "Tester",
-      content: "This is a test message to verify the Google Sheets integration."
+      content: "This is a test message to verify the Google Sheets integration.",
+      jobDescription: "Sample Job Description for testing purposes",
+      profileData: "Name: Test User\nCompany: Test Company\nCurrent Role: Tester"
     }
   }, (response) => {
     if (response && response.ok) {
