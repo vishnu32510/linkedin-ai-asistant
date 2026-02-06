@@ -24,6 +24,20 @@
 - Customizable resume details, signature, and AI prompts
 - Privacy-first: all data stored locally
 
+## 💰 Cost Analysis: Why It's Practically Free
+
+Based on real-world usage with **GPT-4o-mini**, this extension is incredibly cost-effective:
+
+| Metric | Value |
+| :--- | :--- |
+| **Total Outreach Attempts** | **211** |
+| **Total Tokens Used** | **293,491** |
+| **Total Cost** | **$0.03** |
+| **Avg Cost Per Outreach** | **~$0.00014** |
+
+> **🚀 With the OpenAI $5 free tier, you can generating approximately 35,000+ personalized connection notes!** 
+> *The free trial is more than enough for your entire job search.*
+
 ## Installation
 
 ### Prerequisites
