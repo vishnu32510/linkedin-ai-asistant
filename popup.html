@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      width: 350px;
+      width: 400px;
       padding: 16px;
       margin: 0;
       background: #f5f5f5;
@@ -49,6 +49,30 @@
       border-color: #0a66c2;
       box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.1);
     }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .input-group input {
+      flex: 1;
+    }
+    .input-group button.inline-action {
+      width: auto;
+      margin-top: 0;
+      padding: 8px 12px;
+      white-space: nowrap;
+      background: #f0f0f0;
+      color: #333;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      font-size: 12px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .input-group button.inline-action:hover {
+      background: #e0e0e0;
+    }
     .help-text {
       font-size: 11px;
       color: #666;
@@ -58,7 +82,7 @@
       color: #0a66c2;
       text-decoration: none;
     }
-    button {
+    button[type="submit"] {
       background: #0a66c2;
       color: white;
       border: none;
@@ -70,21 +94,8 @@
       width: 100%;
       margin-top: 16px;
     }
-    button:hover {
+    button[type="submit"]:hover {
       background: #004182;
-    }
-    .button-group {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    button.secondary {
-      background: #e0e0e0;
-      color: #333;
-      margin-top: 0;
-    }
-    button.secondary:hover {
-      background: #d0d0d0;
     }
     .status {
       margin-top: 12px;
@@ -102,6 +113,18 @@
       background: #f8d7da;
       color: #721c24;
     }
+    .status-small {
+      font-size: 11px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .status-small.success {
+      color: #155724;
+    }
+    .status-small.error {
+      color: #721c24;
+    }
     .footer {
       margin-top: 16px;
       text-align: center;
@@ -116,26 +139,50 @@
     
     <form id="optionsForm">
       <label for="apiKey">OpenAI API Key</label>
-      <input type="password" id="apiKey" placeholder="sk-proj-..." autocomplete="off">
+    <div class="input-group">
+        <input type="password" id="apiKey" placeholder="sk-proj-..." autocomplete="off">
+        <button type="button" class="inline-action" id="testBtn">Test Key</button>
+        </div>
+        <div id="apiStatus" class="status-small"></div>
       
       <label for="sheetsUrl">Google Sheets Webhook URL (Optional)</label>
-      <input type="text" id="sheetsUrl" placeholder="https://script.google.com/..." autocomplete="off">
+    <div class="input-group">
+        <input type="text" id="sheetsUrl" placeholder="https://script.google.com/..." autocomplete="off">
+        <button type="button" class="inline-action" id="testSheetsBtn">Test Script</button>
+        </div>
+        <div id="sheetsStatus" class="status-small"></div>
 
       <label for="resumeDetails">My Resume / Experience Details</label>
       <textarea id="resumeDetails" placeholder="Paste your resume summary, skills, and work experience here. This will be used to generate personalized messages."></textarea>
       <div class="help-text">Leave empty to use default hardcoded profile.</div>
 
     <label for="signature">Signature (Appended to Messages)</label>
-    <textarea id="signature" style="height: 120px;"
+    <textarea id="signature" style="height: 100px;"
         placeholder="Portfolio: ...&#10;GitHub: ...&#10;&#10;Best regards,&#10;Your Name"></textarea>
     <div class="help-text">Leave empty to use default hardcoded signature.</div>
 
-      <button type="submit">Save Settings</button>
-      
-      <div class="button-group">
-        <button type="button" class="secondary" id="testBtn">Test OpenAI</button>
-        <button type="button" class="secondary" id="testSheetsBtn">Test Sheets</button>
-      </div>
+    <details>
+        <summary style="cursor: pointer; color: #0a66c2; font-size: 13px; font-weight: 600; margin-top: 16px; outline: none;">
+            Advanced Settings</summary>
+        <div style="margin-top: 12px; padding-left: 8px; border-left: 2px solid #eee;">
+        <label for="experienceMapping">1. Experience Mapping Strategy</label>
+        <textarea id="experienceMapping" style="height: 120px; font-size: 11px;"
+            placeholder="* Industry: Reference Project..."></textarea>
+        <div class="help-text">Logic for mapping industries to your projects.</div>
+        
+        <label for="instructions">2. Prompt Instructions</label>
+        <textarea id="instructions" style="height: 150px; font-size: 11px;"
+            placeholder="- Write a personalized message..."></textarea>
+        <div class="help-text">Core instructions for the AI on how to write the message.</div>
+
+        <label for="rules">3. Critical Rules & Format</label>
+        <textarea id="rules" style="height: 150px; font-size: 11px;"
+            placeholder="Format:\n- Start with 'Hi'...\n\nRules:\n- No markdown..."></textarea>
+        <div class="help-text">Formatting rules, prohibited phrases, and output structure.</div>
+        </div>
+    </details>
+
+    <button type="submit">Save Settings</button>
     </form>
 
     <div id="status" class="status"></div>
@@ -145,6 +192,7 @@
     Settings are saved locally in your browser.
   </div>
 
+<script src="prompts.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
