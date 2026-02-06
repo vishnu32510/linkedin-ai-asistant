@@ -49,7 +49,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     }
 
     // Handle Note/Message generation
-    performAIGeneration(apiKey, msg, payload, sendResponse);
+    chrome.storage.sync.get(['resumeDetails'], function (resResult) {
+      const storedResume = resResult.resumeDetails;
+      performAIGeneration(apiKey, msg, payload, storedResume, sendResponse);
+    });
   });
 
   return true; // Keep channel open for async response
@@ -163,13 +166,13 @@ Rules:
 /**
  * Generates Note or Message using OpenAI
  */
-function performAIGeneration(apiKey, msg, payload, sendResponse) {
+function performAIGeneration(apiKey, msg, payload, storedResume, sendResponse) {
   let prompt;
   let maxTokens;
   let responseKey;
 
   const { name, firstName, company, role, jobDescription } = payload;
-  const resumeDetails = getResumeDetails();
+  const resumeDetails = storedResume || getResumeDetails();
 
   if (msg.type === "GENERATE_NOTE") {
     prompt = `
