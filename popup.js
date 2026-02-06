@@ -61,7 +61,15 @@ document.getElementById('optionsForm').addEventListener('submit', (e) => {
       promptInstructions: promptInstructions,
       promptRules: promptRules
   }, () => {
-    showStatus('Settings saved successfully!', 'success');
+    const saveBtn = document.querySelector('button[type="submit"]');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = '✅ Saved!';
+    saveBtn.style.background = '#057642';
+    
+    setTimeout(() => {
+      saveBtn.textContent = originalText;
+      saveBtn.style.background = '';
+    }, 2000);
   });
 });
 

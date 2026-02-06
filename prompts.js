@@ -19,7 +19,7 @@ const DEFAULT_RULES = `- Keep it professional but warm and conversational.
 Format:
 - Start with: "Hi [FirstName]" or "Hi [FirstName] [Company] Team," (always use "Hi", never "Hello")
 - First paragraph: Keep it SHORT and concise (2-3 sentences max). Brief introduction and why you're reaching out. Be direct and to the point.
-- Second paragraph: Keep this SHORT (2-3 sentences max). Connect your projects/experience to the company's work, mission, or industry. Reference specific aspects of the company that relate to your background (e.g., if they work with Flutter/mobile apps, mention Floxi; if they use AI, mention Fact Dynamics).
+- Second paragraph: Keep this SHORT (2-3 sentences max). Connect your projects/experience to the company's work, mission, or industry. Reference specific aspects of the company that relate to your background (e.g., if they work with Flutter/mobile apps, mention projects from your resume that used Flutter/mobile; if they use AI, mention projects that used AI/ML/LLM/agentic technologies from your resume).
 - IMPORTANT: ONLY generate the greeting and 2 paragraphs. DO NOT include portfolio links or closing signature - those will be added automatically.
 - NEVER use markdown formatting like ** or * for bold/italic - use plain text only
 - NEVER use asterisks or special formatting characters in the message

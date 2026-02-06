@@ -59,13 +59,6 @@
       DROPDOWN_WAIT: 5000,
       MODAL_WAIT: 8000,
       RETRY_DELAY: 500
-    },
-    
-    PORTFOLIO_LINKS: {
-      portfolio: "https://vishnupriyan.dev/",
-      github: "https://github.com/vishnu32510",
-      floxi: "https://floxi.co",
-      factDynamics: "https://docs.perplexity.ai/cookbook/showcase/fact-dynamics"
     }
   };
 })();
