@@ -122,18 +122,23 @@ function saveToCache(url, profile) {
  */
 function performAIProfileExtraction(apiKey, pageText, url, sendResponse) {
   const prompt = `
-Extract detailed profile information from this LinkedIn profile text. 
-Focus on identifying the current role, full experience history, and education.
+You are extracting structured data from a LinkedIn profile.
 
-Profile Text Snippet:
+TASK:
+Extract ALL available professional experience entries and education entries from the text.
+Do NOT stop after the first role. Enumerate every distinct experience listed.
+
+Profile Text:
 ${pageText.substring(0, 8000)}
 
-URL: ${url}
-
+Profile URL:
+${url}
+OUTPUT FORMAT (VALID JSON ONLY):
 Return a valid JSON object with the following structure:
 {
   "name": "Full Name",
   "firstName": "First Name",
+  "headline": "Full LinkedIn headline",
   "company": "Current Company Name",
   "role": "Current Job Title / Headline",
   "location": "City, State/Country",
@@ -153,10 +158,18 @@ Return a valid JSON object with the following structure:
   ]
 }
 
-Rules:
-- If a value is unknown, use an empty string or empty array.
-- Be concise in the experience descriptions.
-- Return ONLY the JSON object. No markdown formatting.
+STRICT RULES:
+- Include EVERY job, internship, contract, or role mentioned.
+- Experiences MUST be listed in reverse chronological order (most recent first).
+- If multiple roles exist at the same company, list them as separate entries.
+- Do NOT merge roles unless the title is identical.
+- If information is missing, use an empty string.
+- If no experiences are found, return an empty array.
+- Return ONLY valid JSON. No commentary, no markdown.
+
+VALIDATION:
+- The experiences array should contain MORE THAN ONE entry if multiple roles are present in the text.
+- Do not summarize the career into a single role.
 `;
 
   fetchOpenAI(apiKey, prompt, 800)
@@ -181,7 +194,7 @@ function performAIGeneration(apiKey, msg, payload, storedResume, storedSignature
   let maxTokens;
   let responseKey;
 
-  const { name, company, role, about, bio, jobDescription } = payload;
+  const { name, company, role, headline, about, bio, jobDescription } = payload;
 
   if (msg.type === 'GENERATE_NOTE') {
     // Note generation prompt (short, connecting)
@@ -191,9 +204,10 @@ function performAIGeneration(apiKey, msg, payload, storedResume, storedSignature
 Write a single-paragraph LinkedIn connection note. Be professional and warm.
 
 Recipient:
-Name: ${name}
-Company: ${company}
-Role: ${role}
+Name: ${name || ""}
+Headline: ${headline || ""}
+Company: ${company || ""}
+Role: ${role || ""}
 About/BioSnippets: ${about || bio || ""}
 
 
@@ -228,9 +242,10 @@ Rules:
 Write a professional LinkedIn message. Be warm, personalized, and show genuine interest.
 
 Recipient:
-Name: ${name}
-Company: ${company}
-Role: ${role}
+Name: ${name || ""}
+Headline: ${headline || ""}
+Company: ${company || ""}
+Role: ${role || ""}
 About/BioSnippets: ${about || bio || ""}
 
 ${jobDescription ? `Job Description I'm Applying To:\n${jobDescription}` : "No specific job description detection. Focus on general connection."}
