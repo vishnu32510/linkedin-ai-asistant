@@ -35,7 +35,7 @@ Based on real-world usage with **GPT-4o-mini**, this extension is incredibly cos
 | **Total Cost** | **$0.03** |
 | **Avg Cost Per Outreach** | **~$0.00014** |
 
-> **🚀 With the OpenAI $5 free tier, you can generating approximately 35,000+ personalized connection notes!** 
+> **🚀 With the OpenAI $5 free trial, you can generating approximately 35,000+ personalized connection notes!** 
 > *The free trial is more than enough for your entire job search.*
 
 ## Installation
