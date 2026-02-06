@@ -20,19 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Advanced Settings
         if (result.experienceMapping) {
             document.getElementById('experienceMapping').value = result.experienceMapping;
-        } else {
-            document.getElementById('experienceMapping').value = DEFAULT_MAPPING;
         }
 
         if (result.promptInstructions) {
             document.getElementById('instructions').value = result.promptInstructions;
-        } else {
+        } else if (typeof DEFAULT_INSTRUCTIONS !== 'undefined') {
             document.getElementById('instructions').value = DEFAULT_INSTRUCTIONS;
         }
 
         if (result.promptRules) {
             document.getElementById('rules').value = result.promptRules;
-        } else {
+        } else if (typeof DEFAULT_RULES !== 'undefined') {
             document.getElementById('rules').value = DEFAULT_RULES;
         }
   });
