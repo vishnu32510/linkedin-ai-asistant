@@ -49,9 +49,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     }
 
     // Handle Note/Message generation
-    chrome.storage.sync.get(['resumeDetails'], function (resResult) {
+    chrome.storage.sync.get(['resumeDetails', 'signature'], function (resResult) {
       const storedResume = resResult.resumeDetails;
-      performAIGeneration(apiKey, msg, payload, storedResume, sendResponse);
+      const storedSignature = resResult.signature;
+      performAIGeneration(apiKey, msg, payload, storedResume, storedSignature, sendResponse);
     });
   });
 
@@ -166,7 +167,7 @@ Rules:
 /**
  * Generates Note or Message using OpenAI
  */
-function performAIGeneration(apiKey, msg, payload, storedResume, sendResponse) {
+function performAIGeneration(apiKey, msg, payload, storedResume, storedSignature, sendResponse) {
   let prompt;
   let maxTokens;
   let responseKey;
@@ -318,7 +319,7 @@ My background as a Bac
           messageBody = content.replace(/SUBJECT:.*|MESSAGE:/ig, "").trim();
         }
 
-        const portfolioLinks = `
+        const portfolioLinks = storedSignature || `
 Portfolio: https://vishnupriyan.dev/
 GitHub: https://github.com/vishnu32510
 Floxi (Co-founder): https://floxi.co

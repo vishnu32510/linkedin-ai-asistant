@@ -1,6 +1,6 @@
 // Load saved settings
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.storage.sync.get(['openaiApiKey', 'googleSheetsUrl', 'resumeDetails'], (result) => {
+    chrome.storage.sync.get(['openaiApiKey', 'googleSheetsUrl', 'resumeDetails', 'signature'], (result) => {
     if (result.openaiApiKey) {
       document.getElementById('apiKey').value = result.openaiApiKey;
     }
@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result.resumeDetails) {
       document.getElementById('resumeDetails').value = result.resumeDetails;
     }
+      if (result.signature) {
+          document.getElementById('signature').value = result.signature;
+      }
   });
 });
 
@@ -19,6 +22,7 @@ document.getElementById('optionsForm').addEventListener('submit', (e) => {
   const apiKey = document.getElementById('apiKey').value.trim();
   const sheetsUrl = document.getElementById('sheetsUrl').value.trim();
   const resumeDetails = document.getElementById('resumeDetails').value.trim();
+    const signature = document.getElementById('signature').value.trim();
   
   if (!apiKey) {
     showStatus('Please enter an API key', 'error');
@@ -28,7 +32,8 @@ document.getElementById('optionsForm').addEventListener('submit', (e) => {
   chrome.storage.sync.set({
     openaiApiKey: apiKey,
     googleSheetsUrl: sheetsUrl,
-    resumeDetails: resumeDetails
+      resumeDetails: resumeDetails,
+      signature: signature
   }, () => {
     showStatus('Settings saved successfully!', 'success');
   });
