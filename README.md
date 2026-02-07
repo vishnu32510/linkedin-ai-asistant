@@ -192,3 +192,8 @@ MIT License - see [LICENSE](LICENSE)
 
 Vishnu Priyan Sellam Shanmugavel  
 [github.com/vishnu32510](https://github.com/vishnu32510)
+
+---
+
+> **⚠️ Educational use only — use at your own risk.**  
+> This extension is not endorsed by LinkedIn. LinkedIn's Terms of Service prohibit browser extensions that modify the site or automate activity. Using it may result in account restriction; that outcome is not guaranteed, but the risk exists. You are responsible for your own use.
