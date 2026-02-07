@@ -14,6 +14,10 @@
   </p>
 </p>
 
+<p align="center">
+  <img src="LinkedInNote.gif" alt="LinkedIn AI Assistance demo">
+</p>
+
 ---
 
 ## Features
