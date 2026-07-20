@@ -41,16 +41,16 @@
                 alert("LinkedIn Extension updated. Please refresh the page.");
               }
             }
-            callback(null);
+            callback(null, chrome.runtime.lastError.message);
             return;
           }
 
           if (res && res.ok && res.profile) {
             console.log("✅ AI parsing complete:", res.profile);
-            callback(res.profile);
+            callback(res.profile, null);
           } else {
             console.error("AI parsing failed:", res ? res.error : "No response");
-            callback(null);
+            callback(null, res ? res.error : "No response");
           }
         });
       } catch (e) {
@@ -62,7 +62,7 @@
             alert("LinkedIn Extension updated. Please refresh the page.");
           }
         }
-        callback(null);
+        callback(null, e.message);
       }
     },
 

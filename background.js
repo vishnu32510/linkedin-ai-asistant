@@ -172,7 +172,7 @@ VALIDATION:
 - Do not summarize the career into a single role.
 `;
 
-  fetchOpenAI(apiKey, prompt, 800)
+  fetchOpenAI(apiKey, prompt, 2000)
     .then(content => {
       try {
         const cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
@@ -180,7 +180,7 @@ VALIDATION:
         saveToCache(url, profile);
         sendResponse({ ok: true, profile: profile });
       } catch (e) {
-        sendResponse({ ok: false, error: "JSON parse failed" });
+        sendResponse({ ok: false, error: "JSON parse failed. API response may have been truncated." });
       }
     })
     .catch(err => sendResponse({ ok: false, error: err.message }));

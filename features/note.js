@@ -88,7 +88,7 @@
         }
       });
 
-      LinkedInExtension.Features.Profile.fetchProfileDetails(function (scraped) {
+      LinkedInExtension.Features.Profile.fetchProfileDetails(function (scraped, errorMsg) {
         profileTextarea.disabled = false;
         if (scraped) {
           let str = `Name: ${scraped.name}\nCompany: ${scraped.company}\nCurrent Role: ${scraped.role}\nLocation: ${scraped.location}\n\nEXPERIENCE:\n`;
@@ -98,7 +98,7 @@
           profileTextarea.value = str.trim();
         } else {
           profileTextarea.value = "";
-          profileTextarea.placeholder = "AI failed to parse. Please paste details manually.";
+          profileTextarea.placeholder = `AI failed to parse: ${errorMsg || 'Unknown error'}\n\nPlease paste details manually.`;
         }
       });
 
