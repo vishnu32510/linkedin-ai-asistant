@@ -321,6 +321,7 @@ function fetchOpenAI(apiKey, prompt, maxTokens) {
 }
 
 function fetchGemini(apiKey, prompt, maxTokens) {
+  // Use stable flash model with high rate limits
   const model = 'gemini-3.6-flash';
   return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -329,15 +330,13 @@ function fetchGemini(apiKey, prompt, maxTokens) {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         maxOutputTokens: maxTokens,
-        temperature: 0.7,
-        thinkingConfig: { thinkingBudget: 500 } // 500 thinking + 500 output fits within maxOutputTokens:1000
+        temperature: 0.7
       }
     })
   })
     .then(res => res.json())
     .then(data => {
       if (data.error) throw new Error(data.error.message || data.error.status);
-      // Filter out thought parts (internal reasoning) — only use actual response parts
       const parts = data.candidates[0].content.parts || [];
       const text = parts.filter(p => !p.thought).map(p => p.text || '').join('').trim();
       return text;

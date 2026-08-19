@@ -86,7 +86,8 @@ EDUCATION:
 
 const USER_SIGNATURE = `Portfolio: https://vishnupriyan.dev/
 GitHub: https://github.com/vishnu32510
-Fact Dynamics (Perplexity Showcase): https://docs.perplexity.ai/cookbook/showcase/fact-dynamics
+Perplexity Flutter SDK: https://docs.perplexity.ai/docs/cookbook/showcase/perplexity-flutter
+Fact Dynamics (Perplexity Showcase): https://docs.perplexity.ai/docs/cookbook/showcase/fact-dynamics
 
 Thank you for your time and consideration. I'd love the opportunity to speak further.
 
