@@ -44,10 +44,30 @@
       min-height: 100px;
       resize: vertical;
     }
-    input:focus, textarea:focus {
+    textarea[readonly] {
+      background-color: #f8f9fa;
+      color: #555;
+      cursor: default;
+      border: 1px solid #e1e4e8;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 500;
+      color: #0a66c2;
+      background: #e8f3ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+    textarea:focus {
       outline: none;
       border-color: #0a66c2;
       box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.1);
+    }
+    textarea[readonly]:focus {
+      border-color: #e1e4e8;
+      box-shadow: none;
     }
     .input-group {
       display: flex;
@@ -138,51 +158,55 @@
     <h1>LinkedIn AI Assistant</h1>
     
     <form id="optionsForm">
+      <label for="geminiApiKey">Gemini API Key <span class="badge" style="background:#e6f4ea;color:#137333;">Active</span></label>
+      <div class="input-group">
+        <input type="password" id="geminiApiKey" placeholder="AIza..." autocomplete="off">
+        <button type="button" class="inline-action" id="testGeminiBtn">Test Key</button>
+      </div>
+      <div id="geminiStatus" class="status-small"></div>
+
       <label for="apiKey">OpenAI API Key</label>
-    <div class="input-group">
+      <div class="input-group">
         <input type="password" id="apiKey" placeholder="sk-proj-..." autocomplete="off">
         <button type="button" class="inline-action" id="testBtn">Test Key</button>
-        </div>
-        <div id="apiStatus" class="status-small"></div>
+      </div>
+      <div id="apiStatus" class="status-small"></div>
       
       <label for="sheetsUrl">Google Sheets Webhook URL (Optional)</label>
-    <div class="input-group">
+      <div class="input-group">
         <input type="text" id="sheetsUrl" placeholder="https://script.google.com/..." autocomplete="off">
         <button type="button" class="inline-action" id="testSheetsBtn">Test Script</button>
-        </div>
-        <div id="sheetsStatus" class="status-small"></div>
+      </div>
+      <div id="sheetsStatus" class="status-small"></div>
 
-      <label for="resumeDetails">My Resume / Experience Details</label>
-      <textarea id="resumeDetails" placeholder="Paste your resume summary, skills, and work experience here. This will be used to generate personalized messages."></textarea>
-      <div class="help-text">Leave empty to use default hardcoded profile.</div>
+      <label for="resumeDetails">My Resume / Experience Details <span class="badge">View Only</span></label>
+      <textarea id="resumeDetails" readonly placeholder="Loaded from user_data.js"></textarea>
+      <div class="help-text">View-only. Configured via user_data.js.</div>
 
-    <label for="signature">Signature (Appended to Messages)</label>
-    <textarea id="signature" style="height: 100px;"
-        placeholder="Portfolio: ...&#10;GitHub: ...&#10;&#10;Best regards,&#10;Your Name"></textarea>
-    <div class="help-text">Leave empty to use default hardcoded signature.</div>
+      <label for="signature">Signature (Appended to Messages) <span class="badge">View Only</span></label>
+      <textarea id="signature" style="height: 100px;" readonly placeholder="Loaded from user_data.js"></textarea>
+      <div class="help-text">View-only. Configured via user_data.js.</div>
 
-    <details>
+      <details>
         <summary style="cursor: pointer; color: #0a66c2; font-size: 13px; font-weight: 600; margin-top: 16px; outline: none;">
-            Advanced Settings</summary>
+          Advanced Settings (View Only)
+        </summary>
         <div style="margin-top: 12px; padding-left: 8px; border-left: 2px solid #eee;">
-        <label for="experienceMapping">1. Experience Mapping Strategy</label>
-        <textarea id="experienceMapping" style="height: 120px; font-size: 11px;"
-            placeholder="* Industry: Reference Project..."></textarea>
-        <div class="help-text">Logic for mapping industries to your projects.</div>
-        
-        <label for="instructions">2. Prompt Instructions</label>
-        <textarea id="instructions" style="height: 150px; font-size: 11px;"
-            placeholder="- Write a personalized message..."></textarea>
-        <div class="help-text">Core instructions for the AI on how to write the message.</div>
+          <label for="experienceMapping">1. Experience Mapping Strategy <span class="badge">View Only</span></label>
+          <textarea id="experienceMapping" style="height: 120px; font-size: 11px;" readonly placeholder="Loaded from user_data.js"></textarea>
+          <div class="help-text">View-only. Configured via user_data.js.</div>
+          
+          <label for="instructions">2. Prompt Instructions <span class="badge">View Only</span></label>
+          <textarea id="instructions" style="height: 150px; font-size: 11px;" readonly placeholder="Loaded from user_data.js"></textarea>
+          <div class="help-text">View-only. Configured via user_data.js.</div>
 
-        <label for="rules">3. Critical Rules & Format</label>
-        <textarea id="rules" style="height: 150px; font-size: 11px;"
-            placeholder="Format:\n- Start with 'Hi'...\n\nRules:\n- No markdown..."></textarea>
-        <div class="help-text">Formatting rules, prohibited phrases, and output structure.</div>
+          <label for="rules">3. Critical Rules & Format <span class="badge">View Only</span></label>
+          <textarea id="rules" style="height: 150px; font-size: 11px;" readonly placeholder="Loaded from prompts.js"></textarea>
+          <div class="help-text">View-only. Configured via prompts.js.</div>
         </div>
-    </details>
+      </details>
 
-    <button type="submit">Save Settings</button>
+      <button type="submit">Save API Settings</button>
     </form>
 
     <div id="status" class="status"></div>
@@ -193,6 +217,7 @@
   </div>
 
 <script src="prompts.js"></script>
+  <script src="user_data.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

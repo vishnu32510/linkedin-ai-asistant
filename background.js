@@ -11,7 +11,12 @@ chrome.runtime.onInstalled.addListener(function(details) {
 });
 
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
-importScripts('prompts.js');
+importScripts('prompts.js', 'user_data.js');
+
+// ─── AI PROVIDER FLAG ────────────────────────────────────────────────────────
+// Switch between 'openai' and 'gemini'. No env file needed — just change here.
+const AI_PROVIDER = 'gemini'; // 'openai' | 'gemini'
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Default Fallback Values from prompts.js
 const defaultInstructions = typeof DEFAULT_INSTRUCTIONS !== 'undefined' ? DEFAULT_INSTRUCTIONS : '';
@@ -33,11 +38,12 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   const url = payload.url || "";
 
   // Get API key and Sheets URL from storage
-  chrome.storage.sync.get(['openaiApiKey', 'googleSheetsUrl'], function (result) {
-    const apiKey = result.openaiApiKey;
-    
+  chrome.storage.sync.get(['openaiApiKey', 'geminiApiKey', 'googleSheetsUrl'], function (result) {
+    const apiKey = AI_PROVIDER === 'gemini' ? result.geminiApiKey : result.openaiApiKey;
+
     if (!apiKey) {
-      sendResponse({ ok: false, error: "API key not set. Please set it in Options." });
+      const providerLabel = AI_PROVIDER === 'gemini' ? 'Gemini' : 'OpenAI';
+      sendResponse({ ok: false, error: `${providerLabel} API key not set. Please set it in Options.` });
       return;
     }
 
@@ -53,16 +59,14 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       return;
     }
 
-    // Handle Note/Message generation
-    chrome.storage.sync.get(['resumeDetails', 'signature', 'experienceMapping', 'promptInstructions', 'promptRules'], function (resResult) {
-      const storedResume = resResult.resumeDetails;
-      const storedSignature = resResult.signature;
-      const storedMapping = resResult.experienceMapping;
-      const storedInstructions = resResult.promptInstructions;
-      const storedRules = resResult.promptRules;
+    // Handle Note/Message generation using fixed code configurations
+    const resumeData = typeof USER_RESUME_DETAILS !== 'undefined' ? USER_RESUME_DETAILS : '';
+    const signatureData = typeof USER_SIGNATURE !== 'undefined' ? USER_SIGNATURE : '';
+    const mappingData = typeof USER_EXPERIENCE_MAPPING_STRATEGY !== 'undefined' ? USER_EXPERIENCE_MAPPING_STRATEGY : '';
+    const instructionsData = typeof USER_PROMPT_INSTRUCTIONS !== 'undefined' ? USER_PROMPT_INSTRUCTIONS : defaultInstructions;
+    const rulesData = typeof DEFAULT_RULES !== 'undefined' ? DEFAULT_RULES : '';
 
-      performAIGeneration(apiKey, msg, payload, storedResume, storedSignature, storedMapping, storedInstructions, storedRules, sendResponse);
-    });
+    performAIGeneration(apiKey, msg, payload, resumeData, signatureData, mappingData, instructionsData, rulesData, sendResponse);
   });
 
   return true; // Keep channel open for async response
@@ -172,7 +176,7 @@ VALIDATION:
 - Do not summarize the career into a single role.
 `;
 
-  fetchOpenAI(apiKey, prompt, 2000)
+  fetchAI(apiKey, prompt, 2000)
     .then(content => {
       try {
         const cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
@@ -198,10 +202,11 @@ function performAIGeneration(apiKey, msg, payload, storedResume, storedSignature
 
   if (msg.type === 'GENERATE_NOTE') {
     // Note generation prompt (short, connecting)
-    // My Background:
-    // ${storedResume || ``} Not used at the moment as we need note to be short and concise
     prompt = `
 Write a single-paragraph LinkedIn connection note. Be professional and warm.
+
+My Background (sender):
+${storedResume || ''}
 
 Recipient:
 Name: ${name || ""}
@@ -210,20 +215,17 @@ Company: ${company || ""}
 Role: ${role || ""}
 About/BioSnippets: ${about || bio || ""}
 
-
-
 ${jobDescription ? `Job Description I'm Applying To:\n${jobDescription}` : ""}
 
-CRITICAL: Maximum 300 characters EXACTLY. Count characters carefully. Do not exceed 300 characters.
-
 Instructions:
-${jobDescription ? 
-  `- Write a personalized connection note that relates the recipient's background to the job I'm applying to.
-- If the job description mentions specific skills, technologies, or experiences that match the recipient's background, reference those connections.
-- Show genuine interest in connecting based on relevant experience or shared industry/role.` :
-  `- If the role includes Founder or Co-Founder, express interest in learning about potential opportunities or roles as the company grows.
-- Otherwise, write a general networking note focused on connecting and learning.`}
+${jobDescription ?
+      `- Write a personalized connection note that relates MY background (sender) to the job I'm applying to.
+- Reference a specific, relevant connection between my experience and the job or recipient's background.
+- Show genuine interest in connecting based on that specific shared industry or skill.` :
+      `- If the role includes Founder or Co-Founder, express interest in learning about potential opportunities as the company grows.
+- Otherwise, write a general networking note focused on connecting and learning from their work.`}
 - Keep it concise to stay within the strict 290 character limit.
+- Focus on the recipient's CURRENT or most recent role when making a connection — do not reference older experience.
 
 Rules:
 - Output must be one line only.
@@ -234,7 +236,7 @@ Rules:
 - STRICT: Maximum 290 characters. Verify character count before responding.
 - If your response exceeds 290 characters, shorten it by removing words, not truncating.
 `;
-    maxTokens = 150;
+    maxTokens = 2000; // Plenty of room for thinking + output. Length strictly governed by prompt rules (290 chars).
     responseKey = "note";
   } else {
     // Message generation prompt (longer, professional message)
@@ -245,28 +247,31 @@ Recipient:
 Name: ${name || ""}
 Headline: ${headline || ""}
 Company: ${company || ""}
-Role: ${role || ""}
+Current Role: ${role || ""}
 About/BioSnippets: ${about || bio || ""}
 
-${jobDescription ? `Job Description I'm Applying To:\n${jobDescription}` : "No specific job description detection. Focus on general connection."}
+${payload.profileData ? `Recipient Full Profile (experiences listed most recent first):\n${payload.profileData}` : ''}
+
+${jobDescription ? `Job Description I'm Applying To:\n${jobDescription}` : "No job description provided. Focus on general networking and mutual interest in their work."}
 
 My Background:
 ${storedResume || ''}
 
 Instructions:
 ${storedInstructions || defaultInstructions}
+- When referencing the recipient's background, focus on their CURRENT or most recent 1-2 roles — do not reference their older experience unless it is uniquely relevant.
 
-${storedMapping ? `Experience Mapping Strategy (Use this logic to select relevant projects):
-${storedMapping}` : `Experience Mapping Strategy (Map by comparing resume and job description):`}
+${storedMapping ? `Experience Mapping Strategy (Use this logic to select the most relevant project or role):
+${storedMapping}` : ''}
 
 Rules & Formatting:
 ${storedRules || defaultRules}
 `;
-    maxTokens = 800;
+    maxTokens = 2500; // Plenty of room for thinking + full message output. Length governed by prompt rules.
     responseKey = "message";
   }
 
-  fetchOpenAI(apiKey, prompt, maxTokens)
+  fetchAI(apiKey, prompt, maxTokens)
     .then(content => {
       const response = { ok: true };
       if (responseKey === "message") {
@@ -315,6 +320,45 @@ function fetchOpenAI(apiKey, prompt, maxTokens) {
     });
 }
 
+function fetchGemini(apiKey, prompt, maxTokens) {
+  const model = 'gemini-3.6-flash';
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+        thinkingConfig: { thinkingBudget: 500 } // 500 thinking + 500 output fits within maxOutputTokens:1000
+      }
+    })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error.message || data.error.status);
+      // Filter out thought parts (internal reasoning) — only use actual response parts
+      const parts = data.candidates[0].content.parts || [];
+      const text = parts.filter(p => !p.thought).map(p => p.text || '').join('').trim();
+      return text;
+    });
+}
+
+/**
+ * Routes to the correct AI provider based on AI_PROVIDER flag.
+ * Drop-in replacement for fetchOpenAI — same signature, same return.
+ */
+function fetchAI(apiKey, prompt, maxTokens) {
+  console.log(`🤖 Using provider: ${AI_PROVIDER}`);
+  return AI_PROVIDER === 'gemini'
+    ? fetchGemini(apiKey, prompt, maxTokens)
+    : fetchOpenAI(apiKey, prompt, maxTokens);
+}
+
+
+
+// Removed hardcoded getResumeDetails() - using DEFAULT_RESUME from prompts.js
+
 function handleSheetsLogging(data, sendResponse) {
   chrome.storage.sync.get(['googleSheetsUrl'], function (result) {
     const url = result.googleSheetsUrl;
@@ -355,6 +399,3 @@ function handleSheetsLogging(data, sendResponse) {
       });
   });
 }
-
-
-// Removed hardcoded getResumeDetails() - using DEFAULT_RESUME from prompts.js
